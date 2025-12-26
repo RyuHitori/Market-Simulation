@@ -1,0 +1,118 @@
+import random
+import time
+import heapq
+import numpy as np
+import pandas as pd
+
+import mplfinance as mpf
+import matplotlib.pyplot as plt
+import time
+from datetime import datetime
+
+def ticks_to_ohlc(ticks, start_time, freq="1s"):
+    """
+    ticks: list of trade prices
+    """
+    times = pd.date_range(start=start_time, periods=len(ticks), freq="100ms")
+    s = pd.Series(ticks, index=times)
+
+    ohlc = s.resample(freq).ohlc()
+    return ohlc.dropna()
+
+class OrderBook:
+    def __init__(self):
+        self.bids = []  # max heap via negative prices
+        self.asks = []  # min heap
+
+    def add_limit(self, side, price, qty):
+        if side == "buy":
+            heapq.heappush(self.bids, (-price, qty))
+        else:
+            heapq.heappush(self.asks, (price, qty))
+
+    def market_order(self, side):
+        if side == "buy" and self.asks:
+            price, qty = heapq.heappop(self.asks)
+            return price
+        elif side == "sell" and self.bids:
+            price, qty = heapq.heappop(self.bids)
+            return -price
+        return None
+
+class Maker:
+    def __init__(self, spread=0.01):
+        self.spread = spread
+
+    def act(self, book, last_price):
+        side = random.choice(["buy", "sell"])
+        price = last_price * (1 + random.uniform(-self.spread, self.spread))
+        qty = random.randint(1, 10)
+        book.add_limit(side, price, qty)
+
+class Taker:
+    def act(self, book):
+        side = random.choice(["buy", "sell"])
+        return book.market_order(side)
+
+def run_market_live(
+    start_price=100,
+    n_makers=20,
+    n_takers=5,
+    ticks_per_candle=10,
+    redraw_every=5,
+    sleep = 0
+):
+    book = OrderBook()
+    makers = [Maker() for _ in range(n_makers)]
+    takers = [Taker() for _ in range(n_takers)]
+
+    last_price = start_price
+    ticks = [last_price]
+    start_time = datetime.now()
+
+    plt.ion()
+    fig = mpf.figure(style='yahoo', figsize=(10, 6))
+    ax = fig.add_subplot(111)
+
+    tick_count = 0
+
+    try:
+        while True:
+            for maker in makers:
+                maker.act(book, last_price)
+
+            for taker in takers:
+                trade_price = taker.act(book)
+                if trade_price:
+                    last_price = trade_price
+                    ticks.append(last_price)
+                    tick_count += 1
+
+            if tick_count >= ticks_per_candle and tick_count % redraw_every == 0:
+                ohlc = ticks_to_ohlc(ticks, start_time)
+
+                ax.clear()
+                mpf.plot(
+                    ohlc,
+                    ax=ax,
+                    type='candle',
+                    style='yahoo',
+                    show_nontrading=True
+                )
+                plt.pause(0.01)
+
+            time.sleep(sleep)
+
+    except KeyboardInterrupt:
+        plt.ioff()
+        plt.show()
+
+
+run_market_live(
+    start_price=100,
+    n_makers=30,
+    n_takers=2000,
+    ticks_per_candle=10,
+    redraw_every=5,
+    sleep=0.00
+)
