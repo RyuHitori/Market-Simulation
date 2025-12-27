@@ -46,7 +46,7 @@ class Maker:
     def act(self, book, last_price):
         side = random.choice(["buy", "sell"])
         price = last_price * (1 + random.uniform(-self.spread, self.spread))
-        qty = random.randint(1, 10)
+        qty = random.randint(1, 100)
         book.add_limit(side, price, qty)
 
 class Taker:
@@ -57,7 +57,7 @@ class Taker:
 def run_market_live(
     start_price=100,
     n_makers=20,
-    n_takers=5,
+    n_takers=1000,
     ticks_per_candle=10,
     redraw_every=5,
     sleep = 0
@@ -110,7 +110,7 @@ def run_market_live(
 
 run_market_live(
     start_price=100,
-    n_makers=30,
+    n_makers=1,
     n_takers=2000,
     ticks_per_candle=10,
     redraw_every=5,

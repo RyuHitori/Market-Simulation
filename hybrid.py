@@ -40,34 +40,61 @@ class OrderBook:
         return None
 
 class HybridTrader:
-    def __init__(self, spread=0.01):
+    def __init__(self, spread=0.01, p_market = 0.2):
         self.spread = spread
-        # self.p_market = p_market  # probability of market order
+        self.p_market = p_market  # probability of market order
 
     def act(self, book, last_price):
-        # if random.random() < self.p_market:
-        #     # Market order
-        #     side = random.choice(["buy", "sell"])
-        #     return book.market_order(side)
-        # else:
-        #     # Limit order
-        side = random.choice(["buy", "sell"])
-        price = last_price * (1 + random.uniform(-self.spread, self.spread))
-        qty = random.randint(1, 10)
-        book.add_limit(side, price, qty)
-        return None
+        if random.random() < self.p_market:
+            # Market order
+            side = random.choice(["buy", "sell"])
+            return book.market_order(side)
+        else:
+            # Limit order
+            side = random.choice(["buy", "sell"])
+            price = last_price * (1 + random.uniform(-self.spread, self.spread))
+            qty = random.randint(1, 10)
+            book.add_limit(side, price, qty)
+            return None
 
 
 def run_market_hybrid(
     start_price=100,
     n_traders=30,
-    p_market=0.4,
-    sleep=0.05,
+    p_market=0.2,
     ticks_per_candle=10,
     redraw_every=5
 ):
+    MAX_CANDLES = 100
+    paused = False
+    SLEEP = 0.05
+
+    def on_key(event):
+        nonlocal paused, MAX_CANDLES, SLEEP
+
+        if event.key == ' ':
+            paused = not paused
+            print("Paused" if paused else "Resumed")
+
+        elif event.key == '+':
+            MAX_CANDLES = max(20, MAX_CANDLES - 20)
+            print(f"Zoom in: {MAX_CANDLES}")
+
+        elif event.key == '-':
+            MAX_CANDLES += 20
+            print(f"Zoom out: {MAX_CANDLES}")
+
+        elif event.key == 'e':
+            SLEEP = max(0.01, SLEEP - 0.01)
+            print(f"Speeding up: {SLEEP}")
+
+        elif event.key == 'r':
+            SLEEP += 0.01
+            print(f"Slowing down: {SLEEP}")
+    
+
     book = OrderBook()
-    traders = [HybridTrader() for _ in range(n_traders)]
+    traders = [HybridTrader(p_market=p_market) for _ in range(n_traders)]
 
     last_price = start_price
     ticks = [last_price]
@@ -78,19 +105,24 @@ def run_market_hybrid(
     plt.ion()
     fig = mpf.figure(style='yahoo', figsize=(10, 6))
     ax = fig.add_subplot(111)
+    fig.canvas.mpl_connect('key_press_event', on_key)
 
     try:
         while True:
-            for trader in traders:
-                trade_price = trader.act(book, last_price)
+            if not paused:
+                for trader in traders:
+                    trade_price = trader.act(book, last_price)
 
-                if trade_price is not None:
-                    last_price = trade_price
-                    ticks.append(last_price)
-                    tick_count += 1
+                    if trade_price is not None:
+                        last_price = trade_price
+                        ticks.append(last_price)
+                        tick_count += 1
+
 
             if tick_count >= ticks_per_candle and tick_count % redraw_every == 0:
                 ohlc = ticks_to_ohlc(ticks, start_time)
+                
+                ohlc = ohlc.iloc[-MAX_CANDLES:]
 
                 ax.clear()
                 mpf.plot(
@@ -100,9 +132,10 @@ def run_market_hybrid(
                     style='yahoo',
                     show_nontrading=True
                 )
-                plt.pause(0.01)
+                plt.pause(SLEEP)
 
-            time.sleep(sleep)
+            # ticks = ticks[-5000:]
+            # time.sleep(SLEEP)
 
     except KeyboardInterrupt:
         plt.ioff()
@@ -110,6 +143,8 @@ def run_market_hybrid(
 
 run_market_hybrid(
     start_price=100,
-    n_traders=20,
-    p_market=0.5
+    n_traders=30,
+    p_market=0.8,
+    ticks_per_candle=10,
+    redraw_every=5
 )
