@@ -1,5 +1,4 @@
 import random
-import time
 import heapq
 import numpy as np
 import pandas as pd
@@ -121,7 +120,6 @@ def run_market_hybrid(
 
             if tick_count >= ticks_per_candle and tick_count % redraw_every == 0:
                 ohlc = ticks_to_ohlc(ticks, start_time)
-                
                 ohlc = ohlc.iloc[-MAX_CANDLES:]
 
                 ax.clear()
@@ -132,10 +130,9 @@ def run_market_hybrid(
                     style='yahoo',
                     show_nontrading=True
                 )
-                plt.pause(SLEEP)
+                plt.pause(0.000001)
 
-            # ticks = ticks[-5000:]
-            # time.sleep(SLEEP)
+            time.sleep(SLEEP)
 
     except KeyboardInterrupt:
         plt.ioff()
@@ -144,7 +141,7 @@ def run_market_hybrid(
 run_market_hybrid(
     start_price=100,
     n_traders=30,
-    p_market=0.8,
+    p_market=0.9,
     ticks_per_candle=10,
     redraw_every=5
 )

@@ -60,8 +60,35 @@ def run_market_live(
     n_takers=1000,
     ticks_per_candle=10,
     redraw_every=5,
-    sleep = 0
 ):
+    
+    MAX_CANDLES = 100
+    paused = False
+    SLEEP = 0.05
+
+    def on_key(event):
+        nonlocal paused, MAX_CANDLES, SLEEP
+
+        if event.key == ' ':
+            paused = not paused
+            print("Paused" if paused else "Resumed")
+
+        elif event.key == '+':
+            MAX_CANDLES = max(20, MAX_CANDLES - 20)
+            print(f"Zoom in: {MAX_CANDLES}")
+
+        elif event.key == '-':
+            MAX_CANDLES += 20
+            print(f"Zoom out: {MAX_CANDLES}")
+
+        elif event.key == 'e':
+            SLEEP = max(0.0, SLEEP - 0.01)
+            print(f"Speeding up: {SLEEP}")
+
+        elif event.key == 'r':
+            SLEEP += 0.01
+            print(f"Slowing down: {SLEEP}")
+
     book = OrderBook()
     makers = [Maker() for _ in range(n_makers)]
     takers = [Taker() for _ in range(n_takers)]
@@ -73,23 +100,26 @@ def run_market_live(
     plt.ion()
     fig = mpf.figure(style='yahoo', figsize=(10, 6))
     ax = fig.add_subplot(111)
+    fig.canvas.mpl_connect('key_press_event', on_key)
 
     tick_count = 0
 
     try:
         while True:
-            for maker in makers:
-                maker.act(book, last_price)
+            if not paused:
+                for maker in makers:
+                    maker.act(book, last_price)
 
-            for taker in takers:
-                trade_price = taker.act(book)
-                if trade_price:
-                    last_price = trade_price
-                    ticks.append(last_price)
-                    tick_count += 1
+                for taker in takers:
+                    trade_price = taker.act(book)
+                    if trade_price:
+                        last_price = trade_price
+                        ticks.append(last_price)
+                        tick_count += 1
 
             if tick_count >= ticks_per_candle and tick_count % redraw_every == 0:
                 ohlc = ticks_to_ohlc(ticks, start_time)
+                ohlc = ohlc.iloc[-MAX_CANDLES:]
 
                 ax.clear()
                 mpf.plot(
@@ -101,7 +131,7 @@ def run_market_live(
                 )
                 plt.pause(0.01)
 
-            time.sleep(sleep)
+            time.sleep(SLEEP)
 
     except KeyboardInterrupt:
         plt.ioff()
@@ -110,9 +140,8 @@ def run_market_live(
 
 run_market_live(
     start_price=100,
-    n_makers=1,
-    n_takers=2000,
+    n_makers=2,
+    n_takers=30,
     ticks_per_candle=10,
     redraw_every=5,
-    sleep=0.00
 )
